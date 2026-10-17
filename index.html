@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0f0d">
+<meta name="description" content="16×16 五子棋 AI 对战，黑棋双活三、双四、长连禁手。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d3a35c'/%3E%3Ccircle cx='12' cy='12' r='7' fill='%23111312'/%3E%3Ccircle cx='21' cy='21' r='7' fill='%23f4efe4' stroke='%23877a5e'/%3E%3C/svg%3E">
+<title>五子棋 · AI 对战</title>
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#0b0f0d;
+  --panel:rgba(22,29,25,.9);
+  --line:rgba(255,255,255,.08);
+  --text:#e9efe9;
+  --muted:#93a297;
+  --gold:#d9b465;
+  --gold-strong:#eccb82;
+  --red:#c4553f;
+  --radius:16px;
+  --shadow:0 18px 50px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{
+  margin:0;
+  min-height:100vh;
+  min-height:100dvh;
+  color:var(--text);
+  background:
+    radial-gradient(900px 600px at 15% 0%, rgba(65,92,72,.22), transparent 60%),
+    radial-gradient(700px 500px at 100% 100%, rgba(120,84,38,.14), transparent 55%),
+    linear-gradient(160deg,#0a0e0c,#121915 55%,#0b100d);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:radial-gradient(120% 80% at 50% 30%, transparent 55%, rgba(0,0,0,.22));
+  z-index:-1;
+}
+.app{max-width:1080px;margin:0 auto;padding:28px 20px 40px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.brand-mark{
+  width:44px;height:44px;flex:0 0 auto;border-radius:13px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#e7c783,#b8863f);
+  color:#231a0c;font-weight:800;font-size:21px;
+  box-shadow:0 8px 22px rgba(184,134,63,.24),inset 0 1px 0 rgba(255,255,255,.35);
+}
+h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:12.5px;letter-spacing:.08em}
+.header-btn{
+  flex:0 0 auto;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);
+  color:var(--text);border-radius:11px;padding:9px 15px;font:inherit;font-size:13px;cursor:pointer;
+  transition:background .18s,border-color .18s;
+}
+.header-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+.board-area{min-width:0}
+.board-head{
+  display:flex;align-items:center;gap:12px;
+  width:100%;max-width:660px;min-height:52px;margin:0 auto 12px;
+}
+.turn-stone{
+  width:34px;height:34px;flex:0 0 auto;border-radius:50%;
+  box-shadow:0 4px 12px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.2);
+}
+.turn-stone.black{background:radial-gradient(circle at 32% 28%,#747a74,#262a27 52%,#050606)}
+.turn-stone.white{background:radial-gradient(circle at 32% 28%,#fff,#f0ebdf 52%,#bcb4a3)}
+.status-copy{min-width:0;flex:1}
+#status-label{margin:0;font-size:16px;font-weight:650;letter-spacing:.01em}
+#status-sub{margin:4px 0 0;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spinner{
+  width:18px;height:18px;flex:0 0 auto;border-radius:50%;
+  border:2px solid rgba(255,255,255,.14);border-top-color:var(--gold);
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.board-shell{
+  position:relative;width:100%;max-width:660px;aspect-ratio:1;margin:0 auto;
+  border-radius:18px;overflow:hidden;
+  background:
+    repeating-linear-gradient(94deg, rgba(90,52,18,.09) 0 2px, transparent 2px 8px),
+    repeating-linear-gradient(2deg, rgba(255,240,200,.035) 0 1px, transparent 1px 11px),
+    radial-gradient(120% 90% at 28% 16%, #e8c184 0%, #d3a35c 48%, #b57b3b 100%);
+  box-shadow:inset 0 0 0 1px rgba(70,40,12,.35),inset 0 0 60px rgba(94,54,13,.18),var(--shadow);
+  touch-action:none;
+}
+.board-shell::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,246,220,.18);
+}
+#board{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+.board-caption{
+  width:100%;max-width:660px;margin:10px auto 0;text-align:center;
+  color:var(--muted);font-size:12px;letter-spacing:.06em;
+}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:13px}
+.field label{font-size:12.5px;color:var(--muted)}
+.field:last-of-type{margin-bottom:0}
+select{
+  width:100%;border:1px solid rgba(255,255,255,.09);border-radius:11px;
+  padding:11px 34px 11px 12px;color:var(--text);font:inherit;font-size:13.5px;cursor:pointer;
+  background-color:rgba(255,255,255,.045);
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+  appearance:none;outline:none;
+  transition:border-color .18s,background-color .18s;
+}
+select:hover{background-color:rgba(255,255,255,.07)}
+select:focus-visible{border-color:var(--gold);box-shadow:0 0 0 3px rgba(217,180,101,.14)}
+select option{background:#151c17;color:var(--text)}
+.hint{margin:-4px 0 14px;color:var(--muted);font-size:11.5px;line-height:1.5}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}
+button{
+  border:0;border-radius:11px;padding:11px 14px;font:inherit;font-size:13.5px;cursor:pointer;
+  transition:transform .12s,background .18s,opacity .18s,box-shadow .18s;
+}
+button:active:not(:disabled){transform:translateY(1px)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.36;cursor:not-allowed}
+.primary{
+  background:linear-gradient(145deg,#e7c783,#c59a4d);color:#211708;font-weight:700;
+  box-shadow:0 6px 18px rgba(197,154,77,.2);
+}
+.primary:hover:not(:disabled){box-shadow:0 8px 24px rgba(197,154,77,.28)}
+.secondary{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.08)}
+.secondary:hover:not(:disabled){background:rgba(255,255,255,.1)}
+.check{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px;cursor:pointer;margin-top:15px;user-select:none}
+.check input{width:16px;height:16px;accent-color:var(--gold);cursor:pointer}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat span{display:block;color:var(--muted);font-size:11.5px;margin-bottom:5px}
+.stat strong{font-size:15px;font-weight:600}
+.rules{padding:0;overflow:hidden}
+.rules summary{
+  cursor:pointer;padding:15px 16px;font-size:13.5px;color:var(--text);
+  list-style:none;display:flex;justify-content:space-between;align-items:center;
+}
+.rules summary::-webkit-details-marker{display:none}
+.rules summary::after{content:"+";color:var(--gold);font-size:18px;line-height:1}
+.rules[open] summary::after{content:"−"}
+.rules-body{padding:0 16px 16px;color:var(--muted);font-size:12.8px;line-height:1.75}
+.rules-body ul{margin:0;padding-left:18px}
+.rules-body li{margin:4px 0}
+.toast{
+  position:absolute;left:50%;bottom:18px;z-index:6;
+  transform:translate(-50%,8px);max-width:calc(100% - 32px);
+  padding:9px 14px;border-radius:999px;text-align:center;
+  background:rgba(12,17,13,.94);border:1px solid rgba(255,255,255,.12);
+  color:#f4f6f2;font-size:12.5px;line-height:1.4;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.error{border-color:rgba(196,85,63,.52);color:#ffd9d1}
+.result{
+  position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:rgba(8,12,9,.55);backdrop-filter:blur(7px);
+  opacity:0;pointer-events:none;transition:opacity .25s ease;
+}
+.result.show{opacity:1;pointer-events:auto}
+.result-card{
+  width:min(320px,100%);padding:24px 20px;text-align:center;
+  background:rgba(20,27,22,.97);border:1px solid rgba(255,255,255,.1);
+  border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.5);
+  transform:translateY(10px) scale(.97);transition:transform .25s ease;
+}
+.result.show .result-card{transform:none}
+.result-kicker{margin:0 0 8px;color:var(--muted);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
+.result h2{margin:0;font-size:27px;letter-spacing:.02em}
+.result-reason{margin:8px 0 20px;color:var(--muted);font-size:13px}
+.result-actions{display:grid;gap:9px}
+@media (max-width:860px){
+  .app{padding:20px 14px 34px}
+  .layout{grid-template-columns:1fr;gap:18px}
+  .board-head{max-width:620px}
+  .board-shell{max-width:620px}
+  .side{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .rules{grid-column:1/-1}
+  .card{padding:14px}
+}
+@media (max-width:560px){
+  .topbar{margin-bottom:16px}
+  .brand-mark{width:38px;height:38px;border-radius:10px;font-size:19px}
+  h1{font-size:18px}
+  .header-btn{padding:8px 12px;font-size:12.5px}
+  .side{grid-template-columns:1fr}
+  .board-shell{border-radius:14px}
+  .stats{grid-template-columns:1fr 1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">五</div>
+      <div>
+        <h1>五子棋 · AI 对战</h1>
+        <p>16 × 16 · 黑棋禁手</p>
+      </div>
+    </div>
+    <button id="new-game-top" class="header-btn" type="button">新对局</button>
+  </header>
+
+  <main class="layout">
+    <section class="board-area" aria-label="对局区域">
+      <div class="board-head">
+        <span id="turn-stone" class="turn-stone black" aria-hidden="true"></span>
+        <div class="status-copy">
+          <p id="status-label" aria-live="polite">准备开始</p>
+          <p id="status-sub">你执黑 · 先手</p>
+        </div>
+        <span id="spinner" class="spinner" hidden aria-hidden="true"></span>
+      </div>
+
+      <div class="board-shell">
+        <canvas id="board" aria-label="16乘16五子棋棋盘"></canvas>
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+        <div id="result" class="result" aria-hidden="true">
+          <div class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+            <p class="result-kicker">对局结束</p>
+            <h2 id="result-title">你赢了</h2>
+            <p id="result-reason" class="result-reason">五连</p>
+            <div class="result-actions">
+              <button id="result-new" class="primary" type="button">再来一局</button>
+              <button id="result-close" class="secondary" type="button">查看棋盘</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="board-caption">黑棋禁手：双活三 · 双四 · 长连</div>
+    </section>
+
+    <aside class="side" aria-label="对局设置">
+      <section class="card">
+        <div class="field">
+          <label for="difficulty">AI 难度</label>
+          <select id="difficulty">
+            <option value="easy">简单 · 轻松上手</option>
+            <option value="normal" selected>普通 · 认真对弈</option>
+            <option value="hard">困难 · 全力思考</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="color">我的执子</label>
+          <select id="color">
+            <option value="1">我执黑 · 先手</option>
+            <option value="2">我执白 · 后手</option>
+          </select>
+        </div>
+        <p class="hint">切换执子会立即开始新对局。</p>
+        <div class="actions">
+          <button id="new-game" class="primary" type="button">新对局</button>
+          <button id="undo" class="secondary" type="button">悔棋</button>
+        </div>
+        <label class="check">
+          <input id="show-forbidden" type="checkbox">
+          <span>标记黑棋禁手点</span>
+        </label>
+      </section>
+
+      <section class="card stats" aria-label="对局信息">
+        <div class="stat"><span>当前手数</span><strong id="move-count">0</strong></div>
+        <div class="stat"><span>AI 用时</span><strong id="ai-time">—</strong></div>
+      </section>
+
+      <details class="card rules">
+        <summary>规则与说明</summary>
+        <div class="rules-body">
+          <ul>
+            <li>16×16 棋盘，黑棋先手。</li>
+            <li>黑棋必须恰好连成五子；双活三、双四、长连（六子及以上）为禁手。</li>
+            <li>白棋无禁手，五子及以上即胜。</li>
+            <li>禁手点会被拦截并提示，不会因误触直接判负。</li>
+            <li>AI 采用 α-β 剪枝搜索；难度越高，搜索越深。</li>
+          </ul>
+        </div>
+      </details>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const SIZE = 16;
+  const CELLS = SIZE * SIZE;
+  const EMPTY = 0;
+  const BLACK = 1;
+  const WHITE = 2;
+  const BLOCK = 3;
+  const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
+
+  const WIN_SCORE = 1e12;
+  const OPEN_FOUR = 1e8;
+  const FOUR = 1e6;
+  const OPEN_THREE = 1e4;
+  const BLOCKED_THREE = 1e2;
+
+  const DIFFICULTY = {
+    easy:   { depth: 2, time: 220,  rootLimit: 10, noise: 0.25 },
+    normal: { depth: 4, time: 650,  rootLimit: 14, noise: 0 },
+    hard:   { depth: 6, time: 1200, rootLimit: 16, noise: 0 },
+  };
+
+  const board = new Int8Array(CELLS);
+  const moves = [];
+  const neighborCount = new Uint8Array(CELLS);
+  let stoneCount = 0;
+
+  const state = {
+    turn: BLACK,
+    humanColor: BLACK,
+    aiColor: WHITE,
+    over: false,
+    winner: 0,
+    reason: '',
+    thinking: false,
+    difficulty: 'normal',
+    showForbidden: false,
+    aiToken: 0,
+    lastAiMs: 0,
+    hover: -1,
+    hoverForbidden: null,
+    anim: null,
+    animating: false,
+    forbiddenFlash: null,
+    forbiddenSet: null,
+    forbiddenCacheVersion: -1,
+    posVersion: 0,
+    resultTimer: null,
+    toastTimer: null,
+  };
+
+  const tableBlack = new Float64Array(4096);
+  const tableWhite = new Float64Array(4096);
+  const windows = [];
+  const killers = Array.from({ length: 12 }, () => []);
+  let searchDeadline = 0;
+  let searchTimeUp = false;
+  let searchNodes = 0;
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const shell = canvas.parentElement;
+  const statusLabel = document.getElementById('status-label');
+  const statusSub = document.getElementById('status-sub');
+  const turnStone = document.getElementById('turn-stone');
+  const spinner = document.getElementById('spinner');
+  const toastEl = document.getElementById('toast');
+  const resultEl = document.getElementById('result');
+  const resultTitle = document.getElementById('result-title');
+  const resultReason = document.getElementById('result-reason');
+  const moveCountEl = document.getElementById('move-count');
+  const aiTimeEl = document.getElementById('ai-time');
+  const undoButton = document.getElementById('undo');
+  const difficultySelect = document.getElementById('difficulty');
+  const colorSelect = document.getElementById('color');
+  const showForbiddenCheckbox = document.getElementById('show-forbidden');
+  const newGameButton = document.getElementById('new-game');
+  const newGameTopButton = document.getElementById('new-game-top');
+  const resultNewButton = document.getElementById('result-new');
+  const resultCloseButton = document.getElementById('result-close');
+
+  const view = { size: 0, cell: 0, pad: 0, dpr: 1, grid: null, sprites: null };
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const idxOf = (x, y) => y * SIZE + x;
+  const xOf = i => i % SIZE;
+  const yOf = i => (i / SIZE) | 0;
+  const inBounds = (x, y) => x >= 0 && x < SIZE && y >= 0 && y < SIZE;
+
+  function keyOf(indices) {
+    return indices.slice().sort((a, b) => a - b).join(',');
+  }
+
+  function longestRun(x, y, p) {
+    let max = 1;
+    for (const [dx, dy] of DIRS) {
+      const run = lineRun(x, y, dx, dy, p);
+      if (run.count > max) max = run.count;
+    }
+    return max;
+  }
+
+  function lineRun(x, y, dx, dy, p) {
+    let count = 1;
+    const cells = [idxOf(x, y)];
+    let openEnds = 0;
+    for (const s of [1, -1]) {
+      let nx = x + dx * s;
+      let ny = y + dy * s;
+      while (inBounds(nx, ny) && board[idxOf(nx, ny)] === p) {
+        count++;
+        cells.push(idxOf(nx, ny));
+        nx += dx * s;
+        ny += dy * s;
+      }
+      if (inBounds(nx, ny) && board[idxOf(nx, ny)] === EMPTY) openEnds++;
+    }
+    return { count, openEnds, cells };
+  }
+
+  function collectFourKeys(x, y) {
+    const keys = new Set();
+    for (const [dx, dy] of DIRS) {
+      for (let k = -4; k <= 0; k++) {
+        const sx = x + dx * k;
+        const sy = y + dy * k;
+        let black = 0;
+        let empty = -1;
+        let valid = true;
+        const stones = [];
+        for (let j = 0; j < 5; j++) {
+          const nx = sx + dx * j;
+          const ny = sy + dy * j;
+          if (!inBounds(nx, ny)) {
+            valid = false;
+            break;
+          }
+          const idx = idxOf(nx, ny);
+          if (board[idx] === BLACK) {
+            black++;
+            stones.push(idx);
+          } else if (board[idx] === EMPTY) {
+            empty = idx;
+          } else {
+            valid = false;
+            break;
+          }
+        }
+        if (!valid || black !== 4 || empty < 0) continue;
+        board[empty] = BLACK;
+        const ex = xOf(empty);
+        const ey = yOf(empty);
+        const run = longestRun(ex, ey, BLACK);
+        board[empty] = EMPTY;
+        if (run !== 5) continue;
+        keys.add(keyOf(stones));
+        if (keys.size >= 2) return keys;
+      }
+    }
+    return keys;
+  }
+
+  function collectThreeKeys(x, y) {
+    const keys = new Set();
+    const centerIdx = idxOf(x, y);
+    for (const [dx, dy] of DIRS) {
+      for (let s = -4; s <= 4; s++) {
+        if (s === 0) continue;
+        const ex = x + dx * s;
+        const ey = y + dy * s;
+        if (!inBounds(ex, ey)) continue;
+        const eidx = idxOf(ex, ey);
+        if (board[eidx] !== EMPTY) continue;
+        board[eidx] = BLACK;
+        const run = lineRun(ex, ey, dx, dy, BLACK);
+        const valid = run.count === 4 && run.openEnds === 2 && run.cells.includes(centerIdx);
+        let threeKey = null;
+        if (valid) {
+          const three = run.cells.filter(i => i !== eidx);
+          threeKey = keyOf(three);
+        }
+        board[eidx] = EMPTY;
+        if (valid) {
+          keys.add(threeKey);
+          if (keys.size >= 2) return keys;
+        }
+      }
+    }
+    return keys;
+  }
+
+  function getForbidden(x, y) {
+    if (!inBounds(x, y)) return null;
+    const idx = idxOf(x, y);
+    if (board[idx] !== EMPTY) return null;
+
+    board[idx] = BLACK;
+    let maxRun = 1;
+    for (const [dx, dy] of DIRS) {
+      const run = lineRun(x, y, dx, dy, BLACK);
+      if (run.count > maxRun) maxRun = run.count;
+    }
+    if (maxRun >= 6) {
+      board[idx] = EMPTY;
+      return { type: 'overline', label: '长连（六子及以上）' };
+    }
+    if (maxRun === 5) {
+      board[idx] = EMPTY;
+      return null;
+    }
+    const fours = collectFourKeys(x, y);
+    if (fours.size >= 2) {
+      board[idx] = EMPTY;
+      return { type: 'double-four', label: '双四' };
+    }
+    const threes = collectThreeKeys(x, y);
+    board[idx] = EMPTY;
+    if (threes.size >= 2) {
+      return { type: 'double-three', label: '双活三' };
+    }
+    return null;
+  }
+
+  function checkWin(x, y, p) {
+    const run = longestRun(x, y, p);
+    if (p === BLACK) {
+      if (run >= 6) return { winner: WHITE, reason: '黑棋长连禁手' };
+      if (run === 5) return { winner: BLACK, reason: '五连' };
+    } else if (run >= 5) {
+      return { winner: WHITE, reason: '五连' };
+    }
+    return null;
+  }
+
+  function rebuildNeighbors() {
+    neighborCount.fill(0);
+    stoneCount = 0;
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i] !== EMPTY) stoneCount++;
+    }
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i] !== EMPTY) continue;
+      const x = xOf(i);
+      const y = yOf(i);
+      let c = 0;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (inBounds(nx, ny) && board[idxOf(nx, ny)] !== EMPTY) c++;
+        }
+      }
+      neighborCount[i] = c;
+    }
+  }
+
+  function placeOnBoard(idx, p) {
+    if (board[idx] !== EMPTY) return false;
+    board[idx] = p;
+    stoneCount++;
+    const x = xOf(idx);
+    const y = yOf(idx);
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!inBounds(nx, ny)) continue;
+        const n = idxOf(nx, ny);
+        if (board[n] === EMPTY) neighborCount[n]++;
+      }
+    }
+    neighborCount[idx] = 0;
+    return true;
+  }
+
+  function removeFromBoard(idx) {
+    if (board[idx] === EMPTY) return false;
+    board[idx] = EMPTY;
+    stoneCount--;
+    const x = xOf(idx);
+    const y = yOf(idx);
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!inBounds(nx, ny)) continue;
+        const n = idxOf(nx, ny);
+        if (board[n] === EMPTY) neighborCount[n] = Math.max(0, neighborCount[n] - 1);
+      }
+    }
+    let c = 0;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (inBounds(nx, ny) && board[idxOf(nx, ny)] !== EMPTY) c++;
+      }
+    }
+    neighborCount[idx] = c;
+    return true;
+  }
+
+  function rebuildBoardFromMoves() {
+    board.fill(0);
+    neighborCount.fill(0);
+    stoneCount = 0;
+    for (const m of moves) placeOnBoard(m.idx, m.p);
+  }
+
+  function hasRun(seq, color, len) {
+    let run = 0;
+    for (const v of seq) {
+      if (v === color) {
+        run++;
+        if (run >= len) return true;
+      } else {
+        run = 0;
+      }
+    }
+    return false;
+  }
+
+  function hasPattern(seq, pattern) {
+    for (let i = 0; i <= seq.length - pattern.length; i++) {
+      let ok = true;
+      for (let j = 0; j < pattern.length; j++) {
+        if (seq[i + j] !== pattern[j]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return true;
+    }
+    return false;
+  }
+
+  function scoreWindow(seq, color) {
+    const opp = 3 - color;
+    let own = 0;
+    for (const v of seq) {
+      if (v === opp) return 0;
+      if (v === color) own++;
+    }
+    if (own < 2) return 0;
+    if (own === 6) return color === BLACK ? -WIN_SCORE : WIN_SCORE;
+    if (hasRun(seq, color, 5)) return WIN_SCORE;
+    if (hasPattern(seq, [0, color, color, color, color, 0])) return OPEN_FOUR;
+
+    let four = false;
+    let openThree = false;
+    let three = false;
+    for (let i = 0; i < 6; i++) {
+      if (seq[i] !== EMPTY) continue;
+      const t = seq.slice();
+      t[i] = color;
+      if (hasRun(t, color, 6)) continue;
+      if (hasRun(t, color, 5)) four = true;
+      if (hasPattern(t, [0, color, color, color, color, 0])) openThree = true;
+      if (hasRun(t, color, 4)) three = true;
+    }
+    if (four) return FOUR;
+    if (openThree) return OPEN_THREE;
+    if (three) return BLOCKED_THREE;
+    return 0;
+  }
+
+  function buildPatternTables() {
+    const seq = new Array(6);
+    for (let code = 0; code < 4096; code++) {
+      let c = code;
+      for (let i = 5; i >= 0; i--) {
+        seq[i] = c & 3;
+        c >>= 2;
+      }
+      tableBlack[code] = scoreWindow(seq, BLACK);
+      tableWhite[code] = scoreWindow(seq, WHITE);
+    }
+  }
+
+  function buildWindows() {
+    windows.length = 0;
+    for (const [dx, dy] of DIRS) {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          if (inBounds(x - dx, y - dy)) continue;
+          const cells = [];
+          let nx = x;
+          let ny = y;
+          while (inBounds(nx, ny)) {
+            cells.push(idxOf(nx, ny));
+            nx += dx;
+            ny += dy;
+          }
+          if (cells.length < 5) continue;
+          const padded = [-1, ...cells, -1];
+          for (let s = 0; s <= padded.length - 6; s++) {
+            windows.push(padded.slice(s, s + 6));
+          }
+        }
+      }
+    }
+  }
+
+  function evaluateBoard() {
+    let score = 0;
+    for (let wi = 0; wi < windows.length; wi++) {
+      const w = windows[wi];
+      let code = 0;
+      for (let i = 0; i < 6; i++) {
+        const idx = w[i];
+        code = code * 4 + (idx < 0 ? BLOCK : board[idx]);
+      }
+      score += tableBlack[code] - tableWhite[code];
+    }
+    return score;
+  }
+
+  function shapeScore(len, openEnds) {
+    if (len >= 5) return WIN_SCORE;
+    if (len === 4) return openEnds === 2 ? OPEN_FOUR : openEnds === 1 ? FOUR : 0;
+    if (len === 3) return openEnds === 2 ? OPEN_THREE : openEnds === 1 ? BLOCKED_THREE : 0;
+    if (len === 2) return openEnds === 2 ? 100 : openEnds === 1 ? 10 : 0;
+    return openEnds === 2 ? 1 : 0;
+  }
+
+  function quickPointScore(x, y, p) {
+    let score = 0;
+    for (const [dx, dy] of DIRS) {
+      let count = 1;
+      let openEnds = 0;
+      for (const s of [1, -1]) {
+        let nx = x + dx * s;
+        let ny = y + dy * s;
+        while (inBounds(nx, ny) && board[idxOf(nx, ny)] === p) {
+          count++;
+          nx += dx * s;
+          ny += dy * s;
+        }
+        if (inBounds(nx, ny) && board[idxOf(nx, ny)] === EMPTY) openEnds++;
+      }
+      score += shapeScore(count, openEnds);
+    }
+    score += (30 - Math.abs(x - 7.5) - Math.abs(y - 7.5)) * 0.5;
+    return score;
+  }
+
+  function generateCandidates(player, limit) {
+    if (stoneCount === 0) {
+      return [{ x: 8, y: 8, idx: idxOf(8, 8), score: 0 }];
+    }
+    const opp = 3 - player;
+    const noise = state.difficulty === 'easy' ? DIFFICULTY.easy.noise : 0;
+    const list = [];
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i] !== EMPTY || neighborCount[i] === 0) continue;
+      const x = xOf(i);
+      const y = yOf(i);
+      let s = quickPointScore(x, y, player) + quickPointScore(x, y, opp) * 1.08;
+      if (noise) s *= 1 + (Math.random() * 2 - 1) * noise;
+      list.push({ x, y, idx: i, score: s });
+    }
+    list.sort((a, b) => b.score - a.score);
+
+    if (player !== BLACK) return list.slice(0, limit);
+
+    const legal = [];
+    const scanLimit = Math.min(list.length, Math.max(limit * 4, 24));
+    for (let i = 0; i < scanLimit && legal.length < limit; i++) {
+      const c = list[i];
+      if (!getForbidden(c.x, c.y)) legal.push(c);
+    }
+    return legal;
+  }
+
+  function search(depth, alpha, beta, player, ply) {
+    if (searchTimeUp) return 0;
+    searchNodes++;
+    if ((searchNodes & 1023) === 0 && performance.now() > searchDeadline) {
+      searchTimeUp = true;
+      return 0;
+    }
+    if (depth === 0) {
+      const s = evaluateBoard();
+      return player === BLACK ? s : -s;
+    }
+
+    const limit = depth >= 4 ? 12 : depth >= 2 ? 10 : 8;
+    const candidates = generateCandidates(player, limit);
+    if (candidates.length === 0) return 0;
+
+    const killer = killers[ply];
+    if (killer && killer.length) {
+      candidates.sort((a, b) => (killer.includes(b.idx) ? 1 : 0) - (killer.includes(a.idx) ? 1 : 0));
+    }
+
+    let best = -Infinity;
+    for (const c of candidates) {
+      placeOnBoard(c.idx, player);
+      const run = longestRun(c.x, c.y, player);
+      let terminal = false;
+      let score;
+      if (player === BLACK) {
+        if (run >= 6) {
+          terminal = true;
+          score = -WIN_SCORE + ply;
+        } else if (run === 5) {
+          terminal = true;
+          score = WIN_SCORE - ply;
+        }
+      } else if (run >= 5) {
+        terminal = true;
+        score = WIN_SCORE - ply;
+      }
+      if (!terminal && stoneCount === CELLS) {
+        terminal = true;
+        score = 0;
+      }
+      if (!terminal) {
+        score = -search(depth - 1, -beta, -alpha, 3 - player, ply + 1);
+      }
+      removeFromBoard(c.idx);
+      if (searchTimeUp) return 0;
+
+      if (score > best) best = score;
+      if (score > alpha) alpha = score;
+      if (alpha >= beta) {
+        if (killer && !killer.includes(c.idx)) {
+          killer.unshift(c.idx);
+          if (killer.length > 2) killer.pop();
+        }
+        break;
+      }
+    }
+    return best;
+  }
+
+  function searchRoot(depth, player, candidates, first) {
+    const ordered = first
+      ? [first, ...candidates.filter(c => c.idx !== first.idx)]
+      : candidates;
+    let alpha = -Infinity;
+    let beta = Infinity;
+    let bestMove = ordered[0];
+    let bestScore = -Infinity;
+
+    for (const c of ordered) {
+      placeOnBoard(c.idx, player);
+      const run = longestRun(c.x, c.y, player);
+      let terminal = false;
+      let score;
+      if (player === BLACK) {
+        if (run >= 6) {
+          terminal = true;
+          score = -WIN_SCORE;
+        } else if (run === 5) {
+          terminal = true;
+          score = WIN_SCORE;
+        }
+      } else if (run >= 5) {
+        terminal = true;
+        score = WIN_SCORE;
+      }
+      if (!terminal && stoneCount === CELLS) {
+        terminal = true;
+        score = 0;
+      }
+      if (!terminal) {
+        score = -search(depth - 1, -beta, -alpha, 3 - player, 1);
+      }
+      removeFromBoard(c.idx);
+      if (searchTimeUp) break;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = c;
+      }
+      if (score > alpha) alpha = score;
+      if (score >= WIN_SCORE - 1000) break;
+    }
+    return { move: bestMove, score: bestScore, complete: !searchTimeUp };
+  }
+
+  function fallbackMove(p) {
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i] !== EMPTY) continue;
+      const x = xOf(i);
+      const y = yOf(i);
+      if (p === BLACK && getForbidden(x, y)) continue;
+      return { x, y, idx: i };
+    }
+    return null;
+  }
+
+  function chooseAIMove() {
+    const player = state.aiColor;
+    if (stoneCount === 0) {
+      return { x: 8, y: 8, idx: idxOf(8, 8) };
+    }
+    const cfg = DIFFICULTY[state.difficulty] || DIFFICULTY.normal;
+    const candidates = generateCandidates(player, cfg.rootLimit);
+    if (candidates.length === 0) return fallbackMove(player);
+
+    for (const c of candidates) {
+      placeOnBoard(c.idx, player);
+      const run = longestRun(c.x, c.y, player);
+      const win = player === BLACK ? run === 5 : run >= 5;
+      removeFromBoard(c.idx);
+      if (win) return c;
+    }
+
+    searchDeadline = performance.now() + cfg.time;
+    searchTimeUp = false;
+    searchNodes = 0;
+    let best = candidates[0];
+    let bestScore = -Infinity;
+    let prevBest = best;
+
+    for (let d = 1; d <= cfg.depth; d++) {
+      const res = searchRoot(d, player, candidates, prevBest);
+      if (res.complete) {
+        best = res.move;
+        bestScore = res.score;
+        prevBest = best;
+      }
+      if (searchTimeUp) break;
+      if (Math.abs(bestScore) >= WIN_SCORE - 1000) break;
+    }
+    return best;
+  }
+
+  function formatTime(ms) {
+    if (ms < 1000) return Math.max(1, Math.round(ms)) + ' ms';
+    return (ms / 1000).toFixed(1) + ' s';
+  }
+
+  function showToast(message, kind) {
+    toastEl.textContent = message;
+    toastEl.className = 'toast show' + (kind ? ' ' + kind : '');
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => {
+      toastEl.className = 'toast' + (kind ? ' ' + kind : '');
+    }, 2400);
+  }
+
+  function refreshForbiddenMarks() {
+    if (!state.showForbidden || state.over || state.turn !== BLACK) {
+      state.forbiddenSet = null;
+      state.forbiddenCacheVersion = -1;
+      return;
+    }
+    if (state.forbiddenCacheVersion === state.posVersion && state.forbiddenSet) return;
+    const set = new Set();
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i] !== EMPTY || neighborCount[i] === 0) continue;
+      if (getForbidden(xOf(i), yOf(i))) set.add(i);
+    }
+    state.forbiddenSet = set;
+    state.forbiddenCacheVersion = state.posVersion;
+  }
+
+  function updateUI() {
+    const humanTurn = !state.over && !state.thinking && state.turn === state.humanColor;
+    const side = state.humanColor === BLACK ? '黑' : '白';
+    const order = state.humanColor === BLACK ? '先手' : '后手';
+    let label;
+    let sub;
+
+    if (state.over) {
+      label = state.winner === 0 ? '平局' : state.winner === state.humanColor ? '你赢了' : 'AI 获胜';
+      sub = state.reason;
+    } else if (state.thinking) {
+      label = 'AI 思考中…';
+      sub = '你执' + side + ' · ' + order;
+    } else if (humanTurn) {
+      label = '轮到你落子';
+      sub = '你执' + side + ' · ' + order;
+    } else {
+      label = 'AI 回合';
+      sub = '你执' + side + ' · ' + order;
+    }
+
+    statusLabel.textContent = label;
+    statusSub.textContent = sub;
+
+    const stoneColor = state.over
+      ? (state.winner || (moves.length ? moves[moves.length - 1].p : BLACK))
+      : state.turn;
+    turnStone.className = 'turn-stone ' + (stoneColor === BLACK ? 'black' : 'white');
+    spinner.hidden = !state.thinking;
+    moveCountEl.textContent = String(moves.length);
+    aiTimeEl.textContent = state.lastAiMs ? formatTime(state.lastAiMs) : '—';
+    undoButton.disabled = state.thinking || !moves.some(m => m.p === state.humanColor);
+    canvas.style.cursor = humanTurn ? 'pointer' : 'default';
+
+    refreshForbiddenMarks();
+  }
+
+  function showResult() {
+    if (!state.over) return;
+    resultTitle.textContent = state.winner === 0
+      ? '平局'
+      : state.winner === state.humanColor ? '你赢了' : 'AI 获胜';
+    resultReason.textContent = state.reason;
+    resultEl.classList.add('show');
+    resultEl.setAttribute('aria-hidden', 'false');
+  }
+
+  function hideResult() {
+    resultEl.classList.remove('show');
+    resultEl.setAttribute('aria-hidden', 'true');
+  }
+
+  function endGame(winner, reason) {
+    state.over = true;
+    state.winner = winner;
+    state.reason = reason;
+    state.thinking = false;
+    state.aiToken++;
+    state.hover = -1;
+    state.hoverForbidden = null;
+    state.forbiddenSet = null;
+    state.forbiddenCacheVersion = -1;
+    updateUI();
+    render();
+    clearTimeout(state.resultTimer);
+    state.resultTimer = setTimeout(showResult, 320);
+  }
+
+  function startStoneAnimation(idx, p) {
+    if (reduceMotion) {
+      state.anim = null;
+      render();
+      return;
+    }
+    state.anim = { idx, p, start: performance.now() };
+    if (!state.animating) {
+      state.animating = true;
+      requestAnimationFrame(animateStep);
+    }
+  }
+
+  function animateStep(now) {
+    render(now);
+    if (state.anim && now - state.anim.start < 150) {
+      requestAnimationFrame(animateStep);
+    } else {
+      state.anim = null;
+      state.animating = false;
+      render(now);
+    }
+  }
+
+  function scheduleAI() {
+    if (state.over || state.thinking) return;
+    state.thinking = true;
+    state.aiToken++;
+    const token = state.aiToken;
+    updateUI();
+    render();
+
+    setTimeout(() => {
+      if (token !== state.aiToken || state.over) return;
+      const t0 = performance.now();
+      let move = null;
+      try {
+        move = chooseAIMove();
+      } catch (err) {
+        console.error(err);
+        rebuildBoardFromMoves();
+        move = fallbackMove(state.aiColor);
+      }
+      const dt = performance.now() - t0;
+      if (token !== state.aiToken || state.over) return;
+
+      state.thinking = false;
+      state.lastAiMs = dt;
+      if (!move) {
+        endGame(0, '棋盘已满');
+        return;
+      }
+      const ok = playMove(move.x, move.y, state.aiColor, { ai: true });
+      if (!ok) {
+        const fb = fallbackMove(state.aiColor);
+        if (fb) {
+          playMove(fb.x, fb.y, state.aiColor, { ai: true });
+        } else {
+          endGame(0, '棋盘已满');
+        }
+      }
+    }, 60);
+  }
+
+  function playMove(x, y, p, opts = {}) {
+    if (state.over) return false;
+    if (!inBounds(x, y)) return false;
+    const idx = idxOf(x, y);
+    if (board[idx] !== EMPTY) return false;
+    if (p !== state.turn) return false;
+    if (p === BLACK) {
+      const forbidden = getForbidden(x, y);
+      if (forbidden) {
+        if (opts.human) {
+          showToast('黑棋禁手：' + forbidden.label + '，请另选一点', 'error');
+          state.forbiddenFlash = { idx, until: performance.now() + 700 };
+          render();
+          setTimeout(() => {
+            if (state.forbiddenFlash && state.forbiddenFlash.idx === idx) {
+              state.forbiddenFlash = null;
+              render();
+            }
+          }, 720);
+        }
+        return false;
+      }
+    }
+
+    state.aiToken++;
+    placeOnBoard(idx, p);
+    moves.push({ idx, p });
+    state.posVersion++;
+    state.hover = -1;
+    state.hoverForbidden = null;
+    state.forbiddenSet = null;
+    state.forbiddenCacheVersion = -1;
+    startStoneAnimation(idx, p);
+
+    const win = checkWin(x, y, p);
+    if (win) {
+      endGame(win.winner, win.reason);
+      return true;
+    }
+    if (stoneCount === CELLS) {
+      endGame(0, '棋盘已满');
+      return true;
+    }
+
+    state.turn = 3 - p;
+    state.thinking = false;
+    updateUI();
+    render();
+    if (state.turn === state.aiColor) scheduleAI();
+    return true;
+  }
+
+  function newGame() {
+    state.aiToken++;
+    clearTimeout(state.resultTimer);
+    state.resultTimer = null;
+    hideResult();
+    board.fill(0);
+    neighborCount.fill(0);
+    moves.length = 0;
+    stoneCount = 0;
+
+    state.turn = BLACK;
+    state.over = false;
+    state.winner = 0;
+    state.reason = '';
+    state.thinking = false;
+    state.lastAiMs = 0;
+    state.hover = -1;
+    state.hoverForbidden = null;
+    state.anim = null;
+    state.animating = false;
+    state.forbiddenFlash = null;
+    state.forbiddenSet = null;
+    state.forbiddenCacheVersion = -1;
+    state.posVersion++;
+    killers.forEach(k => { k.length = 0; });
+
+    state.humanColor = Number(colorSelect.value) === WHITE ? WHITE : BLACK;
+    state.aiColor = 3 - state.humanColor;
+    saveSettings();
+    updateUI();
+    render();
+    if (state.aiColor === BLACK) scheduleAI();
+  }
+
+  function undo() {
+    if (state.thinking) return;
+    let lastHuman = -1;
+    for (let i = moves.length - 1; i >= 0; i--) {
+      if (moves[i].p === state.humanColor) {
+        lastHuman = i;
+        break;
+      }
+    }
+    if (lastHuman < 0) return;
+
+    state.aiToken++;
+    clearTimeout(state.resultTimer);
+    state.resultTimer = null;
+    hideResult();
+
+    moves.length = lastHuman;
+    rebuildBoardFromMoves();
+    state.turn = state.humanColor;
+    state.over = false;
+    state.winner = 0;
+    state.reason = '';
+    state.lastAiMs = 0;
+    state.thinking = false;
+    state.hover = -1;
+    state.hoverForbidden = null;
+    state.anim = null;
+    state.animating = false;
+    state.forbiddenFlash = null;
+    state.forbiddenSet = null;
+    state.forbiddenCacheVersion = -1;
+    state.posVersion++;
+    killers.forEach(k => { k.length = 0; });
+
+    updateUI();
+    render();
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem('gomoku-ai-settings', JSON.stringify({
+        difficulty: state.difficulty,
+        humanColor: state.humanColor,
+        showForbidden: state.showForbidden,
+      }));
+    } catch (err) {
+      // localStorage may be unavailable for file:// pages.
+    }
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem('gomoku-ai-settings');
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.difficulty === 'easy' || s.difficulty === 'normal' || s.difficulty === 'hard') {
+        state.difficulty = s.difficulty;
+      }
+      if (s.humanColor === BLACK || s.humanColor === WHITE) {
+        state.humanColor = s.humanColor;
+      }
+      if (typeof s.showForbidden === 'boolean') {
+        state.showForbidden = s.showForbidden;
+      }
+    } catch (err) {
+      // Ignore malformed or unavailable settings.
+    }
+  }
+
+  function resizeCanvas() {
+    const size = Math.floor(shell.clientWidth);
+    if (!size) return;
+    shell.style.height = size + 'px';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    if (size === view.size && dpr === view.dpr && view.sprites) return;
+
+    view.size = size;
+    view.dpr = dpr;
+    view.cell = size / (SIZE + 1);
+    view.pad = view.cell;
+
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    buildSprites();
+    buildGrid();
+    render();
+  }
+
+  function makeStoneSprite(color, r) {
+    const pad = r * 0.55;
+    const logicalSize = r * 2 + pad * 2;
+    const dpr = view.dpr;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(logicalSize * dpr);
+    c.height = Math.ceil(logicalSize * dpr);
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cx = logicalSize / 2;
+    const cy = logicalSize / 2;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,.45)';
+    g.shadowBlur = r * 0.45;
+    g.shadowOffsetY = r * 0.2;
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    const grad = g.createRadialGradient(cx - r * 0.38, cy - r * 0.42, r * 0.08, cx, cy, r * 1.08);
+    if (color === BLACK) {
+      grad.addColorStop(0, '#808680');
+      grad.addColorStop(0.28, '#343936');
+      grad.addColorStop(0.72, '#111312');
+      grad.addColorStop(1, '#020303');
+    } else {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.45, '#f7f3e9');
+      grad.addColorStop(0.82, '#ddd5c6');
+      grad.addColorStop(1, '#b8ae9c');
+    }
+    g.fillStyle = grad;
+    g.fill();
+    g.restore();
+
+    g.beginPath();
+    g.arc(cx, cy, r * 0.985, 0, Math.PI * 2);
+    g.strokeStyle = color === BLACK ? 'rgba(255,255,255,.10)' : 'rgba(92,78,54,.28)';
+    g.lineWidth = Math.max(1, r * 0.045);
+    g.stroke();
+
+    g.beginPath();
+    g.ellipse(cx - r * 0.34, cy - r * 0.38, r * 0.22, r * 0.14, -0.6, 0, Math.PI * 2);
+    g.fillStyle = color === BLACK ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.75)';
+    g.fill();
+
+    return { canvas: c, size: logicalSize };
+  }
+
+  function buildSprites() {
+    const r = view.cell * 0.43;
+    view.sprites = {
+      black: makeStoneSprite(BLACK, r),
+      white: makeStoneSprite(WHITE, r),
+    };
+  }
+
+  function buildGrid() {
+    const { size, cell, pad, dpr } = view;
+    const c = document.createElement('canvas');
+    c.width = Math.round(size * dpr);
+    c.height = Math.round(size * dpr);
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, size, size);
+
+    const end = pad + (SIZE - 1) * cell;
+    g.lineCap = 'butt';
+    g.strokeStyle = 'rgba(62,40,18,.52)';
+    g.lineWidth = 1;
+    for (let i = 0; i < SIZE; i++) {
+      const p = pad + i * cell;
+      g.beginPath();
+      g.moveTo(pad, p);
+      g.lineTo(end, p);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(p, pad);
+      g.lineTo(p, end);
+      g.stroke();
+    }
+    g.strokeStyle = 'rgba(55,34,14,.72)';
+    g.lineWidth = 1.4;
+    g.strokeRect(pad, pad, end - pad, end - pad);
+
+    view.grid = c;
+  }
+
+  function drawStone(cx, cy, p, scale, alpha) {
+    const sp = p === BLACK ? view.sprites.black : view.sprites.white;
+    const d = sp.size * scale;
+    if (alpha !== 1) ctx.globalAlpha = alpha;
+    ctx.drawImage(sp.canvas, cx - d / 2, cy - d / 2, d, d);
+    if (alpha !== 1) ctx.globalAlpha = 1;
+  }
+
+  function render(now = performance.now()) {
+    const { size, cell, pad } = view;
+    if (!size || !view.sprites) return;
+    ctx.clearRect(0, 0, size, size);
+    if (view.grid) ctx.drawImage(view.grid, 0, 0, size, size);
+
+    const animIdx = state.anim ? state.anim.idx : -1;
+    for (const m of moves) {
+      if (m.idx === animIdx) continue;
+      const cx = pad + xOf(m.idx) * cell;
+      const cy = pad + yOf(m.idx) * cell;
+      drawStone(cx, cy, m.p, 1, 1);
+    }
+
+    if (state.anim) {
+      const t = Math.min(1, (now - state.anim.start) / 150);
+      const e = 1 - Math.pow(1 - t, 3);
+      const cx = pad + xOf(state.anim.idx) * cell;
+      const cy = pad + yOf(state.anim.idx) * cell;
+      drawStone(cx, cy, state.anim.p, 0.72 + 0.28 * e, 0.7 + 0.3 * e);
+    }
+
+    if (moves.length) {
+      const last = moves[moves.length - 1];
+      const markerReady = !state.anim || state.anim.idx !== last.idx || now - state.anim.start >= 150;
+      if (markerReady) {
+        const cx = pad + xOf(last.idx) * cell;
+        const cy = pad + yOf(last.idx) * cell;
+        const r = Math.max(2, cell * 0.075);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = last.p === BLACK ? '#f0cf83' : '#a83a2a';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = last.p === BLACK ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.35)';
+        ctx.stroke();
+      }
+    }
+
+    if (state.forbiddenFlash && now < state.forbiddenFlash.until) {
+      const i = state.forbiddenFlash.idx;
+      ctx.beginPath();
+      ctx.arc(pad + xOf(i) * cell, pad + yOf(i) * cell, cell * 0.46, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(210,70,48,.9)';
+      ctx.lineWidth = Math.max(2, cell * 0.07);
+      ctx.stroke();
+    }
+
+    if (state.showForbidden && state.forbiddenSet && !state.over && state.turn === BLACK) {
+      for (const i of state.forbiddenSet) {
+        const cx = pad + xOf(i) * cell;
+        const cy = pad + yOf(i) * cell;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell * 0.16, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(150,40,30,.6)';
+        ctx.lineWidth = Math.max(1, cell * 0.04);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - cell * 0.08, cy - cell * 0.08);
+        ctx.lineTo(cx + cell * 0.08, cy + cell * 0.08);
+        ctx.moveTo(cx + cell * 0.08, cy - cell * 0.08);
+        ctx.lineTo(cx - cell * 0.08, cy + cell * 0.08);
+        ctx.strokeStyle = 'rgba(150,40,30,.5)';
+        ctx.stroke();
+      }
+    }
+
+    if (state.hover >= 0 && board[state.hover] === EMPTY && !state.over && !state.thinking && state.turn === state.humanColor) {
+      const cx = pad + xOf(state.hover) * cell;
+      const cy = pad + yOf(state.hover) * cell;
+      if (state.hoverForbidden) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell * 0.42, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(180,55,38,.75)';
+        ctx.lineWidth = Math.max(2, cell * 0.055);
+        ctx.stroke();
+      } else {
+        drawStone(cx, cy, state.humanColor, 1, 0.28);
+      }
+    }
+  }
+
+  function pointFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width) return null;
+    const x = (e.clientX - rect.left) / rect.width * view.size;
+    const y = (e.clientY - rect.top) / rect.height * view.size;
+    const gx = Math.round((x - view.pad) / view.cell);
+    const gy = Math.round((y - view.pad) / view.cell);
+    if (gx < 0 || gx >= SIZE || gy < 0 || gy >= SIZE) return null;
+    const cx = view.pad + gx * view.cell;
+    const cy = view.pad + gy * view.cell;
+    if (Math.hypot(x - cx, y - cy) > view.cell * 0.72) return null;
+    return { x: gx, y: gy };
+  }
+
+  function onPointerMove(e) {
+    if (e.pointerType === 'touch') return;
+    const p = pointFromEvent(e);
+    const idx = p ? idxOf(p.x, p.y) : -1;
+    if (idx === state.hover) return;
+    state.hover = idx;
+    state.hoverForbidden = null;
+    if (
+      idx >= 0 &&
+      state.humanColor === BLACK &&
+      !state.over &&
+      !state.thinking &&
+      state.turn === state.humanColor &&
+      board[idx] === EMPTY
+    ) {
+      state.hoverForbidden = getForbidden(p.x, p.y);
+    }
+    render();
+  }
+
+  function clearHover() {
+    if (state.hover !== -1 || state.hoverForbidden) {
+      state.hover = -1;
+      state.hoverForbidden = null;
+      render();
+    }
+  }
+
+  function onBoardPointerDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    if (state.over) return;
+    if (state.thinking) {
+      showToast('AI 正在思考，请稍候');
+      return;
+    }
+    if (state.turn !== state.humanColor) return;
+    const p = pointFromEvent(e);
+    if (!p) return;
+    const idx = idxOf(p.x, p.y);
+    if (board[idx] !== EMPTY) return;
+    if (state.humanColor === BLACK) {
+      const forbidden = getForbidden(p.x, p.y);
+      if (forbidden) {
+        showToast('黑棋禁手：' + forbidden.label + '，请另选一点', 'error');
+        state.forbiddenFlash = { idx, until: performance.now() + 700 };
+        render();
+        setTimeout(() => {
+          if (state.forbiddenFlash && state.forbiddenFlash.idx === idx) {
+            state.forbiddenFlash = null;
+            render();
+          }
+        }, 720);
+        return;
+      }
+    }
+    playMove(p.x, p.y, state.humanColor, { human: true });
+  }
+
+  let resizeRaf = 0;
+  function scheduleResize() {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(resizeCanvas);
+  }
+
+  function bindEvents() {
+    canvas.addEventListener('pointerdown', onBoardPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', clearHover);
+    canvas.addEventListener('pointercancel', clearHover);
+    window.addEventListener('resize', scheduleResize);
+
+    if (window.ResizeObserver) {
+      new ResizeObserver(scheduleResize).observe(shell);
+    }
+
+    newGameButton.addEventListener('click', newGame);
+    newGameTopButton.addEventListener('click', newGame);
+    undoButton.addEventListener('click', undo);
+    resultNewButton.addEventListener('click', newGame);
+    resultCloseButton.addEventListener('click', hideResult);
+    resultEl.addEventListener('click', e => {
+      if (e.target === resultEl) hideResult();
+    });
+
+    difficultySelect.addEventListener('change', () => {
+      state.difficulty = difficultySelect.value;
+      saveSettings();
+      showToast('AI 难度已调整为' + (state.difficulty === 'easy' ? '简单' : state.difficulty === 'hard' ? '困难' : '普通'));
+    });
+
+    colorSelect.addEventListener('change', () => {
+      newGame();
+      showToast(state.humanColor === BLACK ? '新对局：你执黑先手' : '新对局：你执白后手');
+    });
+
+    showForbiddenCheckbox.addEventListener('change', () => {
+      state.showForbidden = showForbiddenCheckbox.checked;
+      saveSettings();
+      updateUI();
+      render();
+    });
+  }
+
+  window.Gomoku = {
+    SIZE,
+    BLACK,
+    WHITE,
+    EMPTY,
+    board,
+    moves,
+    state,
+    neighborCount,
+    get stoneCount() { return stoneCount; },
+    rebuildNeighbors,
+    rebuildBoardFromMoves,
+    getForbidden,
+    longestRun,
+    evaluateBoard,
+    generateCandidates,
+    placeOnBoard,
+    removeFromBoard,
+    chooseAIMove,
+    checkWin,
+    render,
+    updateUI,
+    refreshForbiddenMarks,
+    newGame,
+    playMove,
+  };
+
+  buildPatternTables();
+  buildWindows();
+  loadSettings();
+  difficultySelect.value = state.difficulty;
+  colorSelect.value = String(state.humanColor);
+  showForbiddenCheckbox.checked = state.showForbidden;
+  bindEvents();
+  resizeCanvas();
+  newGame();
+  requestAnimationFrame(resizeCanvas);
+})();
+</script>
+</body>
+</html>
